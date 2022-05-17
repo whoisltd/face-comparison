@@ -2,6 +2,7 @@ import cv2
 import numpy as np
 
 import tensorflow.keras.backend as tfback
+import tensorflow
 
 from pathlib import Path
 
@@ -244,11 +245,35 @@ def facenet_model(input_shape):
 
 def img_to_encoding(image, model):
     # Resize for model
-    resized = cv2.resize(image, (96, 96))
+    factor_0 = 160 / image.shape[0]
+    factor_1 = 160 / image.shape[1]
+    factor = min(factor_0, factor_1)
+
+    dsize = (int(image.shape[1] * factor), int(image.shape[0] * factor))
+    resized = cv2.resize(image, dsize)
+
+    diff_0 = 160 - resized.shape[0]
+    diff_1 = 160 - resized.shape[1]
+    img = np.pad(resized, ((diff_0 // 2, diff_0 - diff_0 // 2), (diff_1 // 2, diff_1 - diff_1 // 2), (0, 0)), 'constant')
+
+    if img.shape[0:2] != (160, 160):
+        img = cv2.resize(img, (160, 160))
+
+    img_pixels = tensorflow.keras.preprocessing.image.img_to_array(img) #what this line doing? must?
+    
+    img_pixels = np.expand_dims(img_pixels, axis = 0)
+    
+    # img_pixels /= 255
+    # img_pixels *= 255
+    img_pixels /= 127.5
+    img_pixels -= 1
+    
+    embedding = model.predict(img_pixels)[0].tolist()
+    # resized = cv2.resize(image, (160, 160))
     # Swap channel dimensions
-    input_img = resized[...,::-1]
-    # Switch to channels first and round to specific precision.
-    input_img = np.around(np.transpose(input_img, (2,0,1))/255.0, decimals=12)
-    x_train = np.array([input_img])
-    embedding = model.predict_on_batch(x_train)
+    # input_img = resized[...,::-1]
+    # # Switch to channels first and round to specific precision.
+    # input_img = np.around(np.transpose(input_img, (2,0,1))/255.0, decimals=12)
+    # x_train = np.array([input_img])
+    # embedding = model.predict_on_batch(x_train)
     return embedding
